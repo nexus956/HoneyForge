@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoneyForge — Live Honeypot Dashboard</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#11151f; --panel2:#151b28; --border:#1f2735;
+    --text:#d5dce8; --dim:#7c8798; --accent:#4ade80; --accent2:#38bdf8;
+    --low:#60a5fa; --med:#facc15; --high:#fb923c; --crit:#f87171;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.5 "JetBrains Mono","Fira Code",Consolas,monospace}
+  header{display:flex;align-items:center;gap:14px;padding:16px 24px;
+         border-bottom:1px solid var(--border)}
+  header h1{margin:0;font-size:18px;letter-spacing:2px}
+  header h1 span{color:var(--accent)}
+  .live{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);
+       animation:pulse 1.5s infinite}
+  @keyframes pulse{0%{opacity:1}50%{opacity:.25}100%{opacity:1}}
+  main{max-width:1200px;margin:0 auto;padding:24px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+         gap:14px;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+        padding:16px}
+  .card .k{font-size:11px;letter-spacing:1px;color:var(--dim);
+           text-transform:uppercase}
+  .card .v{font-size:28px;margin-top:4px;color:var(--accent2)}
+  .card .sub{font-size:11px;color:var(--dim);margin-top:2px}
+  nav{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  nav button{background:var(--panel);border:1px solid var(--border);
+             color:var(--dim);padding:7px 16px;border-radius:6px;cursor:pointer;
+             font:inherit}
+  nav button.active{color:var(--accent);border-color:var(--accent)}
+  section{display:none}
+  section.show{display:block}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .panel{background:var(--panel);border:1px solid var(--border);
+         border-radius:8px;padding:14px;overflow:auto}
+  .panel h2{margin:0 0 10px;font-size:12px;letter-spacing:1px;
+            text-transform:uppercase;color:var(--dim)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{color:var(--dim);text-align:left;font-weight:normal;padding:4px 8px;
+     border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:5px 8px;border-bottom:1px solid #161c29;vertical-align:top}
+  tr:hover td{background:var(--panel2)}
+  .sev{padding:1px 8px;border-radius:10px;font-size:11px}
+  .sev.low{color:var(--low);border:1px solid var(--low)}
+  .sev.medium{color:var(--med);border:1px solid var(--med)}
+  .sev.high{color:var(--high);border:1px solid var(--high)}
+  .sev.critical{color:var(--crit);border:1px solid var(--crit)}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:60px;margin-top:8px}
+  .spark div{flex:1;background:var(--accent2);border-radius:2px 2px 0 0;
+             min-height:2px;opacity:.75}
+  .spark div:last-child{background:var(--accent)}
+  .mono-dim{color:var(--dim)}
+  .empty{color:var(--dim);padding:18px;text-align:center}
+  .cred{color:var(--accent)}
+  footer{text-align:center;color:var(--dim);font-size:11px;margin-top:26px}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>HONEY<span>FORGE</span></h1>
+  <div class="live"><div class="dot"></div> live</div>
+  <div class="live" id="clock"></div>
+</header>
+<main>
+  <div class="cards" id="cards"></div>
+  <nav>
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="events">Events</button>
+    <button data-tab="logins">Credentials</button>
+    <button data-tab="alerts">Alerts</button>
+  </nav>
+
+  <section id="overview" class="show">
+    <div class="grid">
+      <div class="panel"><h2>Activity — last 24h</h2><div id="spark" class="spark"></div></div>
+      <div class="panel"><h2>Top attackers</h2><div id="top-ips"></div></div>
+      <div class="panel"><h2>Most probed HTTP paths</h2><div id="top-paths"></div></div>
+      <div class="panel"><h2>Top credentials seen</h2><div id="top-creds"></div></div>
+      <div class="panel"><h2>Service activity</h2><div id="top-services"></div></div>
+      <div class="panel"><h2>Latest alerts</h2><div id="ov-alerts"></div></div>
+    </div>
+  </section>
+
+  <section id="events">
+    <div class="panel"><h2>Recent events</h2><div id="events-table"></div></div>
+  </section>
+
+  <section id="logins">
+    <div class="panel"><h2>Captured credentials</h2><div id="logins-table"></div></div>
+  </section>
+
+  <section id="alerts">
+    <div class="panel"><h2>Alerts</h2><div id="alerts-table"></div></div>
+  </section>
+
+  <footer>honeyforge · deception, observed · zero dependencies</footer>
+</main>
+
+<script>
+"use strict";
+const $ = (sel) => document.querySelector(sel);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+      (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function api(path){
+  const res = await fetch(path);
+  if(!res.ok) throw new Error(path + " → " + res.status);
+  return res.json();
+}
+
+function table(headers, rows){
+  if(!rows.length) return `<div class="empty">no data yet — give the worms some time</div>`;
+  const head = headers.map((h) => `<th>${h}</th>`).join("");
+  const body = rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("");
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function sevBadge(sev){
+  return `<span class="sev ${esc(sev)}">${esc(sev)}</span>`;
+}
+
+function tsFmt(ts){
+  if(!ts) return "-";
+  return new Date(ts * 1000).toISOString().replace("T"," ").slice(0,19);
+}
+
+function renderCards(c){
+  const items = [
+    ["Events", c.events, "total captured"],
+    ["Unique attackers", c.unique_ips, "distinct source IPs"],
+    ["Credentials", c.logins, "username/password pairs"],
+    ["Alerts", c.alerts, "brute force · recon · malware"],
+  ];
+  $("#cards").innerHTML = items.map(([k, v, sub]) =>
+    `<div class="card"><div class="k">${k}</div>
+     <div class="v">${Number(v ?? 0).toLocaleString()}</div>
+     <div class="sub">${sub}</div></div>`).join("");
+}
+
+function renderSpark(timeline){
+  const max = Math.max(1, ...timeline.map((t) => t.count));
+  $("#spark").innerHTML = timeline.map((t) =>
+    `<div style="height:${Math.round((t.count / max) * 60)}px"
+      title="${tsFmt(t.ts)} — ${t.count} events"></div>`).join("");
+}
+
+function renderOverview(s){
+  renderSpark(s.timeline || []);
+  $("#top-ips").innerHTML = table(["source ip","hits"],
+    (s.top_ips || []).map((r) => [esc(r.src_ip || "?"), r.hits]));
+  $("#top-paths").innerHTML = table(["path","hits"],
+    (s.top_paths || []).map((r) => [esc(r.path), r.hits]));
+  $("#top-creds").innerHTML = table(["username","password","uses"],
+    (s.top_credentials || []).map((r) =>
+      [esc(r.username), `<span class="cred">${esc(r.password)}</span>`, r.uses]));
+  $("#top-services").innerHTML = table(["service","hits"],
+    (s.top_services || []).map((r) => [esc(r.service || "?"), r.hits]));
+  $("#ov-alerts").innerHTML = table(["time","sev","type","source"],
+    (s.recent_alerts || []).map((r) =>
+      [tsFmt(r.ts), sevBadge(r.severity), esc(r.alert_type), esc(r.src_ip || "-")]));
+}
+
+function renderEvents(events){
+  $("#events-table").innerHTML = table(
+    ["time","type","service","source","details"],
+    events.map((e) => {
+      let det = e.details || {};
+      if(typeof det === "string"){ try{ det = JSON.parse(det); }catch(_){ det = {}; } }
+      const keys = Object.entries(det)
+        .filter(([k]) => !["method","path"].includes(k) || e.type !== "http_request")
+        .slice(0, 4).map(([k, v]) => `${k}=${String(v).slice(0, 40)}`)
+        .join(" · ");
+      return [tsFmt(e.ts), `<span class="mono-dim">${esc(e.type)}</span>`,
+              esc(e.service || "?"), `${esc(e.src_ip || "?")}:${e.src_port || 0}`,
+              esc(keys)];
+    }));
+}
+
+function renderLogins(rows){
+  $("#logins-table").innerHTML = table(
+    ["time","service","source","username","password"],
+    rows.map((r) => [tsFmt(r.ts), esc(r.service), esc(r.src_ip || "-"),
+      esc(r.username), `<span class="cred">${esc(r.password)}</span>`]));
+}
+
+function renderAlerts(rows){
+  $("#alerts-table").innerHTML = table(
+    ["time","severity","type","source","message"],
+    rows.map((r) => [tsFmt(r.ts), sevBadge(r.severity), esc(r.alert_type),
+      esc(r.src_ip || "-"), esc(r.message)]));
+}
+
+let activeTab = "overview";
+document.querySelectorAll("nav button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll("section").forEach((s) => s.classList.remove("show"));
+    btn.classList.add("active");
+    activeTab = btn.dataset.tab;
+    $("#" + activeTab).classList.add("show");
+    refresh();
+  });
+});
+
+async function refresh(){
+  try{
+    const [summary, events, logins, alerts] = await Promise.all([
+      api("/api/summary"), api("/api/events?limit=100"),
+      api("/api/logins?limit=100"), api("/api/alerts?limit=100"),
+    ]);
+    renderCards(summary.counts || {});
+    if(activeTab === "overview") renderOverview(summary);
+    if(activeTab === "events") renderEvents(events);
+    if(activeTab === "logins") renderLogins(logins);
+    if(activeTab === "alerts") renderAlerts(alerts);
+    $("#clock").textContent = new Date().toISOString().slice(0,19).replace("T"," ") + " UTC";
+  }catch(err){
+    $("#clock").textContent = "connection lost — retrying";
+  }
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

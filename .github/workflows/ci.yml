@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Byte-compile all modules
+        run: python -m compileall -q honeyforge
+      - name: CLI smoke (version + init)
+        run: |
+          python -m honeyforge --version
+          python -m honeyforge init /tmp/honeyforge.json
+      - name: Run test suite
+        run: python -m unittest discover -t . -v
+
+  verify-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Confirm zero runtime dependencies
+        run: |
+          python - <<'EOF'
+          import ast, pathlib, sys
+          stdlib = sys.stdlib_module_names
+          offenders = []
+          for path in pathlib.Path("honeyforge").rglob("*.py"):
+              for node in ast.walk(ast.parse(path.read_text())):
+                  mods = []
+                  if isinstance(node, ast.Import):
+                      mods = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      mods = [node.module.split(".")[0]]
+                  for m in mods:
+                      if m not in stdlib and m != "honeyforge":
+                          offenders.append(f"{path}: imports {m}")
+          if offenders:
+              print("non-stdlib imports found:")
+              print("\n".join(offenders))
+              sys.exit(1)
+          print("OK: honeyforge imports only the standard library")
+          EOF

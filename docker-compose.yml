@@ -1,0 +1,15 @@
+services:
+  honeyforge:
+    build: .
+    container_name: honeyforge
+    restart: unless-stopped
+    ports:
+      # decoys on canonical ports: looks like a genuinely exposed device
+      - "80:8080"    # HTTP  (router admin panel)
+      - "22:2222"    # SSH   (banner + kexinit fingerprinting)
+      - "23:2323"    # Telnet (busybox IoT shell)
+      - "21:2121"    # FTP   (upload capture)
+      # dashboard — bind to loopback only, or remove if you don't need it
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - ./data:/opt/honeyforge/data

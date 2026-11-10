@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "honeyforge"
+version = "1.0.0"
+description = "A zero-dependency, multi-protocol honeypot framework: SSH, HTTP, Telnet and FTP decoys with live alerting, SQLite analytics, malware capture and a built-in web dashboard."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "nexus956" }]
+keywords = ["honeypot", "security", "ids", "blue-team", "deception", "threat-intel"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+
+[project.scripts]
+honeyforge = "honeyforge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["honeyforge*"]
+
+[tool.setuptools.package-data]
+honeyforge = ["dashboard/templates/*.html"]
+
+[tool.ruff]
+line-length = 100

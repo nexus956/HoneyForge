@@ -1,0 +1,51 @@
+{
+  "host": "0.0.0.0",
+  "services": {
+    "http": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 8080,
+      "banner": "lighttpd/1.4.54",
+      "redirect_after_login": "/dashboard.html"
+    },
+    "ssh": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 2222,
+      "banner": "SSH-2.0-OpenSSH_9.6p1 Debian-3"
+    },
+    "telnet": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 2323,
+      "banner": "BusyBox v1.22.1 (2026-01-04 15:30:22 UTC) built-in shell",
+      "prompt": "# "
+    },
+    "ftp": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 2121,
+      "banner": "220 HoneyForge FTP server ready.",
+      "save_uploads": true
+    }
+  },
+  "alerts": {
+    "enabled": true,
+    "brute_force_threshold": 5,
+    "brute_force_window": 300,
+    "recon_services": 3,
+    "recon_window": 600,
+    "cooldown": 120,
+    "scanner_paths": true
+  },
+  "storage": {
+    "db_path": "data/honeyforge.db",
+    "jsonl_path": "data/events.jsonl",
+    "uploads_dir": "data/uploads"
+  },
+  "dashboard": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 8081
+  }
+}
